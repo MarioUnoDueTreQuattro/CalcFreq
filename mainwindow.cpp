@@ -180,62 +180,97 @@ void MainWindow::calculateTempo()
     ui->tableTempo->setRowCount(0);
     double bpm = ui->spinBpm->value();
     if (bpm <= 0.0) return;
+
     // Durata del quarto (1/4) in ms
     double quarterNoteMs = 60000.0 / bpm;
-    // Sottomultipli: da 1/1024 a 1/8
-    for (int i = 10; i >= 3; --i)
+
+    // p rappresenta l'esponente di 2 rispetto al quarto (1/4):
+    // p = -8 -> 1/1024
+    // p =  0 -> 1/4
+    // p =  1 -> 1/2
+    // p =  2 -> 1
+    // p =  3 -> 2 ... fino a 512 battute (p = 11)
+
+    for (int p = -8; p <= 11; ++p)
     {
-        double factor = std::pow(2.0, i); // 1024 down to 8
-        double durationMs = quarterNoteMs * (4.0 / factor);
+        double relativeFactor = std::pow(2.0, p);
+
+        // Durata in ms: scala direttamente proporzionale alla lunghezza della nota
+        double durationMs = quarterNoteMs * relativeFactor;
+
+        QString noteLabel;
+        if (p < 0) {
+            // Frazionari: 1/1024, 1/512 ... 1/8
+            int denominator = static_cast<int>(4.0 / relativeFactor);
+            noteLabel = QString("1/%1").arg(denominator);
+        } else if (p == 0) {
+            noteLabel = "1/4";
+        } else if (p == 1) {
+            noteLabel = "1/2";
+        } else if (p == 2) {
+            noteLabel = "1";
+        } else {
+            // Da 2 battute in su (2, 4, 8, 16 ... 512)
+            int bars = static_cast<int>(relativeFactor / 4.0);
+            noteLabel = QString::number(bars);
+        }
+
         int row = ui->tableTempo->rowCount();
         ui->tableTempo->insertRow(row);
-        ui->tableTempo->setItem(row, 0, new QTableWidgetItem(QString("1/%1").arg(factor)));
-        ui->tableTempo->setItem(row, 1, new QTableWidgetItem(QString::number(durationMs, 'f', 6)));
-    }
-    // Multipli: da 1/4 (1) fino a battute intere (512)
-    for (int i = 0; i <= 9; ++i)
-    {
-        double factor = std::pow(2.0, i); // 1, 2, 4, 8 ... 512
-        double durationMs = quarterNoteMs * factor;
-        int row = ui->tableTempo->rowCount();
-        ui->tableTempo->insertRow(row);
-        // Se factor == 1 è il quarto (1/4), altrimenti mostra il moltiplicatore
-        QString noteLabel = (i == 0) ? "1/4" : QString::number(factor);
         ui->tableTempo->setItem(row, 0, new QTableWidgetItem(noteLabel));
         ui->tableTempo->setItem(row, 1, new QTableWidgetItem(QString::number(durationMs, 'f', 6)));
     }
+
     ui->tableTempo->resizeColumnsToContents();
 }
+
 void MainWindow::calculateLfo()
 {
     ui->tableLfo->setRowCount(0);
     double bpm = ui->spinBpm->value();
     if (bpm <= 0.0) return;
+
     // Frequenza del quarto (1/4) in Hz -> (BPM / 60)
     double quarterHz = bpm / 60.0;
-    // Sottomultipli veloci: da 1/1024 a 1/8
-    for (int i = 10; i >= 3; --i)
+
+    // p rappresenta l'esponente di 2 rispetto al quarto (1/4):
+    // p = -8 -> 1/1024 (2^-8)
+    // p =  0 -> 1/4    (2^0)
+    // p =  1 -> 1/2    (2^1)
+    // p =  2 -> 1      (2^2)
+    // p =  3 -> 2      (2^3) ... fino a 512 battute (p = 11)
+
+    for (int p = -8; p <= 11; ++p)
     {
-        double factor = std::pow(2.0, i); // 1024 down to 8
-        double lfoHz = quarterHz * (factor / 4.0);
+        double relativeFactor = std::pow(2.0, p);
+
+        // Frequenza LFO: se la nota è più veloce del 1/4 (p < 0), Hz aumenta.
+        // Se è più lenta/lunga (p > 0), Hz diminuisce.
+        double lfoHz = quarterHz * std::pow(2.0, -p);
+
+        QString noteLabel;
+        if (p < 0) {
+            // Frazionari: 1/1024, 1/512 ... 1/8
+            int denominator = static_cast<int>(4.0 / relativeFactor);
+            noteLabel = QString("1/%1").arg(denominator);
+        } else if (p == 0) {
+            noteLabel = "1/4";
+        } else if (p == 1) {
+            noteLabel = "1/2";
+        } else if (p == 2) {
+            noteLabel = "1";
+        } else {
+            // Da 2 battute in su (2, 4, 8, 16 ... 512)
+            int bars = static_cast<int>(relativeFactor / 4.0);
+            noteLabel = QString::number(bars);
+        }
+
         int row = ui->tableLfo->rowCount();
         ui->tableLfo->insertRow(row);
-        ui->tableLfo->setItem(row, 0, new QTableWidgetItem(QString("1/%1").arg(factor)));
-        //ui->tableLfo->setItem(row, 1, new QTableWidgetItem(QString::number(lfoHz, 'f', 12)));
+        ui->tableLfo->setItem(row, 0, new QTableWidgetItem(noteLabel));
         ui->tableLfo->setItem(row, 1, new QTableWidgetItem(QString::number(lfoHz, 'g', 16)));
     }
-    // Multipli lenti: da 1/4 fino a 512 battute
-    for (int i = 0; i <= 9; ++i)
-    {
-        double factor = std::pow(2.0, i); // 1, 2, 4... 512
-        double lfoHz = (quarterHz / 4.0) / factor;
-        int row = ui->tableLfo->rowCount();
-        ui->tableLfo->insertRow(row);
-        QString noteLabel = (i == 0) ? "1/4" : QString::number(factor);
-        ui->tableLfo->setItem(row, 0, new QTableWidgetItem(noteLabel));
-        // 8 decimali di precisione
-        ui->tableLfo->setItem(row, 1, new QTableWidgetItem(QString::number(lfoHz, 'f', 8)));
-    }
+
     ui->tableLfo->resizeColumnsToContents();
 }
 
