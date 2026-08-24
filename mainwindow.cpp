@@ -16,6 +16,10 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     initUi();
+    QIcon appIcon = QIcon::fromTheme("calcfreq", QIcon(":/icons/calcfreq.svg"));
+    setWindowIcon(appIcon);
+    this->setWindowIcon(appIcon);
+    qApp->setWindowIcon(appIcon);
     loadSettings();
 }
 
