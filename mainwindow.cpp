@@ -17,15 +17,12 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     initUi();
     // QIcon rawSvg(":/icons/calcfreq.svg");
-    //     QIcon multiIcon;
-
-    //     const int sizes[] = {16, 24, 32, 48, 64, 128, 256};
-    //     for (int s : sizes) {
-    //         multiIcon.addPixmap(rawSvg.pixmap(s, s));
-    //     }
-
-    //     this->setWindowIcon(multiIcon);
-
+    // QIcon multiIcon;
+    // const int sizes[] = {16, 24, 32, 48, 64, 128, 256};
+    // for (int s : sizes) {
+    // multiIcon.addPixmap(rawSvg.pixmap(s, s));
+    // }
+    // this->setWindowIcon(multiIcon);
     loadSettings();
 }
 
@@ -98,10 +95,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
 }
 void MainWindow::initUi()
 {
-    ui->tableLfo->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    ui->tableLfo->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
     ui->tableHarmonics->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     ui->tableNoteToBpm->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    ui->tableTempo->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    ui->tableTempo->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
     ui->comboNote->addItems(AudioUtils::NOTE_NAMES);
     ui->comboOctaveMode->addItems(
     {
@@ -156,6 +153,22 @@ void MainWindow::calculateHarmonics()
         ui->tableHarmonics->setItem(row, 1, new QTableWidgetItem(QString::number(harmonicFactor)));
     }
     ui->tableHarmonics->resizeColumnsToContents();
+    updateNoteCycleTime(baseFreq);
+    ui->tableHarmonics->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+}
+
+void MainWindow::updateNoteCycleTime(double noteFreqHz)
+{
+    if (noteFreqHz <= 0.0) {
+        ui->lblNoteCycleMs->setText("-");
+        return;
+    }
+
+    // Durata di 1 ciclo della nota in ms
+    double cycleMs = 1000.0 / noteFreqHz;
+
+    // Mostra il risultato nella nuova QLabel (es. 440 Hz -> 2.272727 ms)
+    ui->lblNoteCycleMs->setText("Cycle duration: " + QString::number(cycleMs, 'f', 4) + " ms");
 }
 
 void MainWindow::calculateNoteToBpm()
@@ -173,8 +186,10 @@ void MainWindow::calculateNoteToBpm()
         ui->tableNoteToBpm->setItem(row, 1, new QTableWidgetItem(QString::number(coef)));
     }
     ui->tableNoteToBpm->resizeColumnsToContents();
-}
+    ui->tableNoteToBpm->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
 
+}
+/*
 void MainWindow::calculateTempo()
 {
     ui->tableTempo->setRowCount(0);
@@ -223,7 +238,59 @@ void MainWindow::calculateTempo()
 
     ui->tableTempo->resizeColumnsToContents();
 }
+*/
 
+void MainWindow::calculateTempo()
+{
+    ui->tableTempo->setRowCount(0);
+    double bpm = ui->spinBpm->value();
+    if (bpm <= 0.0) return;
+    // Durata del quarto (1/4) in ms
+    double quarterNoteMs = 60000.0 / bpm;
+    // p = -8 (1/1024) ... p = 0 (1/4) ... p = 11 (512 battute)
+    for (int p = -8; p <= 11; ++p)
+    {
+        double relativeFactor = std::pow(2.0, p);
+        // Calcolo delle durate
+        double straightMs = quarterNoteMs * relativeFactor;
+        double tripletMs = straightMs * (2.0 / 3.0);
+        double dottedMs = straightMs * 1.5;
+        // Formattazione etichetta nota
+        QString noteLabel;
+        if (p < 0)
+        {
+            int denominator = static_cast<int>(4.0 / relativeFactor);
+            noteLabel = QString("1/%1").arg(denominator);
+        }
+        else if (p == 0)
+        {
+            noteLabel = "1/4";
+        }
+        else if (p == 1)
+        {
+            noteLabel = "1/2";
+        }
+        else if (p == 2)
+        {
+            noteLabel = "1";
+        }
+        else
+        {
+            int bars = static_cast<int>(relativeFactor / 4.0);
+            noteLabel = QString::number(bars);
+        }
+        int row = ui->tableTempo->rowCount();
+        ui->tableTempo->insertRow(row);
+        ui->tableTempo->setItem(row, 0, new QTableWidgetItem(noteLabel));
+        ui->tableTempo->setItem(row, 1, new QTableWidgetItem(QString::number(straightMs, 'f', 6)));
+        ui->tableTempo->setItem(row, 2, new QTableWidgetItem(QString::number(tripletMs, 'f', 6)));
+        ui->tableTempo->setItem(row, 3, new QTableWidgetItem(QString::number(dottedMs, 'f', 6)));
+    }
+    ui->tableTempo->resizeColumnsToContents();
+    ui->tableTempo->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
+}
+
+/*
 void MainWindow::calculateLfo()
 {
     ui->tableLfo->setRowCount(0);
@@ -273,8 +340,57 @@ void MainWindow::calculateLfo()
 
     ui->tableLfo->resizeColumnsToContents();
 }
+*/
+void MainWindow::calculateLfo()
+{
+    ui->tableLfo->setRowCount(0);
+    double bpm = ui->spinBpm->value();
+    if (bpm <= 0.0) return;
+    // Frequenza del quarto (1/4) in Hz -> (BPM / 60)
+    double quarterHz = bpm / 60.0;
+    for (int p = -8; p <= 11; ++p)
+    {
+        double relativeFactor = std::pow(2.0, p);
+        // Frequenze Hz
+        double straightHz = quarterHz * std::pow(2.0, -p);
+        double tripletHz = straightHz * 1.5;
+        double dottedHz = straightHz * (2.0 / 3.0);
+        QString noteLabel;
+        if (p < 0)
+        {
+            int denominator = static_cast<int>(4.0 / relativeFactor);
+            noteLabel = QString("1/%1").arg(denominator);
+        }
+        else if (p == 0)
+        {
+            noteLabel = "1/4";
+        }
+        else if (p == 1)
+        {
+            noteLabel = "1/2";
+        }
+        else if (p == 2)
+        {
+            noteLabel = "1";
+        }
+        else
+        {
+            int bars = static_cast<int>(relativeFactor / 4.0);
+            noteLabel = QString::number(bars);
+        }
+        int row = ui->tableLfo->rowCount();
+        ui->tableLfo->insertRow(row);
+        ui->tableLfo->setItem(row, 0, new QTableWidgetItem(noteLabel));
+        ui->tableLfo->setItem(row, 1, new QTableWidgetItem(QString::number(straightHz, 'g', 16)));
+        ui->tableLfo->setItem(row, 2, new QTableWidgetItem(QString::number(tripletHz, 'g', 16)));
+        ui->tableLfo->setItem(row, 3, new QTableWidgetItem(QString::number(dottedHz, 'g', 16)));
+    }
+    ui->tableLfo->resizeColumnsToContents();
+    ui->tableLfo->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
 
-void MainWindow::calculateCycleTuner()
+}
+
+/*void MainWindow::calculateCycleTuner()
 {
     double val = ui->spinCycleVal->value();
     NoteInfo info = ui->radioMs->isChecked() ? AudioUtils::periodMsToNote(val) : AudioUtils::frequencyToNote(val);
@@ -283,7 +399,36 @@ void MainWindow::calculateCycleTuner()
     ui->lblResFreq->setText(QString::number(info.targetFrequency, 'f', 2) + " Hz");
     QString sign = info.centsOffset >= 0 ? "+" : "";
     ui->lblResCents->setText(QString("%1%2 cents").arg(sign).arg(info.centsOffset, 0, 'f', 1));
+}*/
+
+void MainWindow::calculateCycleTuner()
+{
+    double val = ui->spinCycleVal->value();
+    NoteInfo info = ui->radioMs->isChecked() ? AudioUtils::periodMsToNote(val) : AudioUtils::frequencyToNote(val);
+
+    if (info.name.isEmpty()) {
+        ui->lblResNote->setText("-");
+        ui->lblResFreq->setText("-");
+        ui->lblResCycle->setText("-");
+        ui->lblResCents->setText("-");
+        return;
+    }
+
+    ui->lblResNote->setText(QString("%1%2").arg(info.name).arg(info.octave));
+    ui->lblResFreq->setText(QString::number(info.targetFrequency, 'f', 2) + " Hz");
+
+    // Calcolo del ciclo ideale in ms: T = 1000 / f
+    if (info.targetFrequency > 0.0) {
+        double idealCycleMs = 1000.0 / info.targetFrequency;
+        ui->lblResCycle->setText(QString::number(idealCycleMs, 'f', 4) + " ms");
+    } else {
+        ui->lblResCycle->setText("-");
+    }
+
+    QString sign = info.centsOffset >= 0 ? "+" : "";
+    ui->lblResCents->setText(QString("%1%2 cents").arg(sign).arg(info.centsOffset, 0, 'f', 1));
 }
+
 
 void MainWindow::copyTableCellToClipboard(int row, int column, QTableWidget *table)
 {
