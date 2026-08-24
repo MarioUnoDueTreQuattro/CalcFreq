@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/">
         <file>icons/calcfreq.svg</file>
+        <file>icons/calcfreq.png</file>
     </qresource>
 </RCC>

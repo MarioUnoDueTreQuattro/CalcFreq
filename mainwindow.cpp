@@ -16,10 +16,16 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     initUi();
-    QIcon appIcon = QIcon::fromTheme("calcfreq", QIcon(":/icons/calcfreq.svg"));
-    setWindowIcon(appIcon);
-    this->setWindowIcon(appIcon);
-    qApp->setWindowIcon(appIcon);
+    // QIcon rawSvg(":/icons/calcfreq.svg");
+    //     QIcon multiIcon;
+
+    //     const int sizes[] = {16, 24, 32, 48, 64, 128, 256};
+    //     for (int s : sizes) {
+    //         multiIcon.addPixmap(rawSvg.pixmap(s, s));
+    //     }
+
+    //     this->setWindowIcon(multiIcon);
+
     loadSettings();
 }
 
