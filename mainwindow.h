@@ -26,7 +26,6 @@ private slots:
     void calculateCycleTuner();
     void exportVoxengoGlissEq();
     void copyTableCellToClipboard(int row, int column, QTableWidget *table);
-
 private:
     Ui::MainWindow *ui;
     void initUi();
